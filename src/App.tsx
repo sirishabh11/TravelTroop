@@ -1,39 +1,149 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { experiences } from './data/experiences';
-
-function Wordmark({ footer = false }: { footer?: boolean }) {
-  const [scroll, setScroll] = useState(0);
-  useEffect(() => { const fn = () => setScroll(window.scrollY); window.addEventListener('scroll', fn, { passive: true }); return () => window.removeEventListener('scroll', fn); }, []);
-  const letters = 'TRAVELTROOP'.split('');
-  return <div className={`wordmark ${footer ? 'wordmark-footer' : ''}`} aria-label="TRAVELTROOP">{letters.map((l, i) => <span key={i} style={{ transform: `translateY(${Math.abs(i - 5) * Math.min(scroll / 300, 1.6) * 2}px)`, letterSpacing: `${Math.min(scroll / 450, 1) * .12}em` }}>{l}</span>)}</div>;
+import { useEffect, useState, type ReactNode } from "react";
+import {
+  BrowserRouter,
+  Link,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+} from "react-router-dom";
+import { AuthProvider, useAuth } from "./lib/auth";
+import { brand } from "./lib/brand";
+import { supabase } from "./lib/supabase";
+import { BackendGate, Notice, NotFound } from "./components/UI";
+import Landing from "./pages/Landing";
+import Auth from "./pages/Auth";
+import CreateTrip from "./pages/CreateTrip";
+import Trips from "./pages/Trips";
+import Dashboard from "./pages/Dashboard";
+import Respond from "./pages/Respond";
+import "./saas.css";
+function RequireLeader({ children }: { children: ReactNode }) {
+  const { session, loading, error } = useAuth();
+  const location = useLocation();
+  return (
+    <BackendGate>
+      {loading ? (
+        <div className="workspace">
+          <Notice>Checking your session…</Notice>
+        </div>
+      ) : error ? (
+        <div className="workspace">
+          <Notice error>{error}</Notice>
+        </div>
+      ) : session ? (
+        children
+      ) : (
+        <Navigate
+          to={`/auth?next=${encodeURIComponent(location.pathname)}`}
+          replace
+        />
+      )}
+    </BackendGate>
+  );
 }
-function Navbar() {
-  const [open, setOpen] = useState(false);
-  return <header className="nav"><a className="brand" href="#top">TRAVELTROOP<span>.</span></a><button className="menu" aria-label={open ? 'Close menu' : 'Open menu'} aria-expanded={open} onClick={() => setOpen(!open)}><i/><i/></button><nav className={open ? 'navlinks open' : 'navlinks'} aria-label="Main navigation">{[['EXPLORE','#discover'],['TRIPS','#plan'],['TROOPS','#troop'],['EXPERIENCES','#experiences']].map(([t,h]) => <a key={t} href={h} onClick={() => setOpen(false)}>{t}</a>)}</nav><a className="nav-cta" href="#troop">PLAN A TRIP <span>↗</span></a></header>;
+function Shell() {
+  const { session } = useAuth();
+  const location = useLocation();
+  const [open, setOpen] = useState(false),
+    [error, setError] = useState("");
+  useEffect(() => {
+    setOpen(false);
+    setError("");
+    window.scrollTo(0, 0);
+    document.title = `${brand.name} — ${brand.tagline}`;
+  }, [location.pathname]);
+  async function signOut() {
+    const result = await supabase?.auth.signOut();
+    if (result?.error) setError(result.error.message);
+  }
+  return (
+    <>
+      <a className="skip-link" href="#main">
+        Skip to content
+      </a>
+      <header className="nav">
+        <Link className="brand" to="/">
+          {brand.wordmark}
+          <span>.</span>
+        </Link>
+        <button
+          className="menu"
+          aria-label={open ? "Close menu" : "Open menu"}
+          aria-expanded={open}
+          onClick={() => setOpen(!open)}
+        >
+          <i />
+          <i />
+        </button>
+        <nav
+          className={`navlinks ${open ? "open" : ""}`}
+          aria-label="Main navigation"
+        >
+          <Link to="/">HOW IT WORKS</Link>
+          <Link to="/trips">MY TRIPS</Link>
+          {session ? (
+            <button className="text-button" onClick={signOut}>
+              SIGN OUT
+            </button>
+          ) : (
+            <Link to="/auth">SIGN IN</Link>
+          )}
+        </nav>
+        <Link className="nav-cta" to="/trips/new">
+          CREATE A TRIP <span>↗</span>
+        </Link>
+      </header>
+      {error && (
+        <div className="workspace">
+          <Notice error>{error}</Notice>
+        </div>
+      )}
+      <main
+        id="main"
+        tabIndex={-1}
+        className={location.pathname === "/" ? "" : "app-main"}
+      >
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="/auth" element={<Auth />} />
+          <Route
+            path="/trips"
+            element={
+              <RequireLeader>
+                <Trips />
+              </RequireLeader>
+            }
+          />
+          <Route
+            path="/trips/new"
+            element={
+              <RequireLeader>
+                <CreateTrip />
+              </RequireLeader>
+            }
+          />
+          <Route
+            path="/trips/:id"
+            element={
+              <RequireLeader>
+                <Dashboard />
+              </RequireLeader>
+            }
+          />
+          <Route path="/invite/:token" element={<Respond />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </main>
+    </>
+  );
 }
-function Ticket() {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (matchMedia('(prefers-reduced-motion: reduce)').matches) return; const update = () => { if (!ref.current) return; const p = Math.min(window.scrollY / 2100, 1), stops = [{x:77,y:32,r:7,s:1,o:1},{x:9,y:44,r:-8,s:.92,o:1},{x:76,y:48,r:6,s:.88,o:1},{x:17,y:42,r:-5,s:.8,o:1},{x:76,y:65,r:3,s:.7,o:0}], q=p*(stops.length-1), a=Math.floor(q), b=Math.min(a+1,stops.length-1), t=q-a; const v=(k:keyof typeof stops[0])=>stops[a][k]*(1-t)+stops[b][k]*t; ref.current.style.setProperty('--tx',`${v('x')}%`);ref.current.style.setProperty('--ty',`${v('y')}vh`);ref.current.style.setProperty('--rot',`${v('r')}deg`);ref.current.style.setProperty('--scale',`${v('s')}`);ref.current.style.setProperty('--opacity',`${v('o')}`);ref.current.style.visibility=v('o')<.01?'hidden':'visible'; }; update(); window.addEventListener('scroll',update,{passive:true});return()=>window.removeEventListener('scroll',update); },[]);
-  return <aside className="ticket" ref={ref} aria-hidden="true"><div className="ticket-top"><span>TRAVELTROOP</span><span>INDIA</span></div><div className="ticket-mid"><b>TT / 028</b><svg viewBox="0 0 120 38"><path d="M3 30 C24 4 36 35 55 17 S82 8 117 4"/><circle cx="3" cy="30" r="2"/><circle cx="117" cy="4" r="2"/></svg></div><div className="ticket-bottom"><span>DEL—JAI—GOA</span><span>NO. 004281</span></div><div className="ticket-perf"/></aside>;
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <Shell />
+      </AuthProvider>
+    </BrowserRouter>
+  );
 }
-function RouteDrawing({active}:{active:typeof experiences[number]}) {
-  const pathRef=useRef<SVGPathElement>(null), panelRef=useRef<HTMLDivElement>(null);
-  useEffect(()=>{const path=pathRef.current;if(!path)return;const len=path.getTotalLength();path.style.strokeDasharray=`${len}`;path.style.strokeDashoffset=`${len}`;if(matchMedia('(prefers-reduced-motion: reduce)').matches){path.style.strokeDashoffset='0';return}const obs=new IntersectionObserver(es=>{if(es[0].isIntersecting){path.style.transition='stroke-dashoffset 2s cubic-bezier(.2,.7,.2,1)';path.style.strokeDashoffset='0'}else{path.style.transition='none';path.style.strokeDashoffset=`${len}`}}, {threshold:.25});if(panelRef.current)obs.observe(panelRef.current);return()=>obs.disconnect()},[active]);
-  return <div className="route-panel" ref={panelRef}><div className="route-label">A ROUTE TAKES SHAPE <span>DRAWN TO GO</span></div><svg className="route-svg" viewBox="0 0 760 310" role="img" aria-label={`${active.route.join(' to ')} illustrative travel route`}><path ref={pathRef} d={active.path}/>{[75,370,690].map((x,i)=><g key={i} className="route-stop" transform={`translate(${x} ${i===0?(active.id==='nature'||active.id==='wellness'?104:245):i===2?88:174})`}><circle r="5"/><text y="25" textAnchor="middle">{active.route[i]}</text></g>)}</svg><div className="route-legend"><span>01 / START</span><span>→</span><span>03 / FOLLOW THE LINE</span></div><p className="route-description">{active.description}</p><div className="route-facts"><div><b>{active.stops}</b><small>STOPS</small></div><div><b>{active.days}</b><small>DURATION</small></div><div><b>{active.note}</b><small>TRIP CONFIGURATION</small></div></div></div>;
-}
-function App(){
- const [active,setActive]=useState(experiences[0]),[vibe,setVibe]=useState('SLOW & SOCIAL'),[message,setMessage]=useState('');
- useEffect(()=>{if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;const obs=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)e.target.classList.add('seen')}),{threshold:.12});document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));return()=>obs.disconnect()},[]);
- const regions=[['01','NORTH','Himalayan escapes / old cities / mountain cafés'],['02','WEST','Desert roads / coastal towns / design & culture'],['03','SOUTH','Backwaters / beaches / food trails / heritage'],['04','NORTHEAST','Cloud forests / living cultures / slow travel'],['05','CENTRAL','Wildlife / forests / forgotten architecture']];
- const profiles=[['ARJUN','DELHI','Weekend mountain trips','photo-1500648767791-00dcc994a43e'],['MEHA','MUMBAI','Food + culture','photo-1534528741775-53994a69daeb'],['RIYA','BENGALURU','Art + slow travel','photo-1531123897727-8f129e1688ce']];
- const steps=[['01','PICK A PLACE','Tell us what kind of trip you want.'],['02','BUILD YOUR ROUTE','Combine destinations and experiences.'],['03','FIND YOUR TROOP','Invite or discover compatible travellers.'],['04','GO','Get your itinerary and start travelling.']];
- return <><Navbar/><Ticket/><main id="top">
- <section className="hero"><div className="hero-copy"><p className="eyebrow">INDIA / 28 STATES / COUNTLESS STORIES</p><h1>Travel India.<br/>Find your <em>troop.</em></h1><p className="hero-deck">From hidden cafés to mountain roads, local food to last-minute plans — find places worth going to and people worth going with.</p><div className="hero-actions"><a className="button button-dark" href="#discover">EXPLORE INDIA <span>↗</span></a><a className="button" href="#troop">BUILD YOUR TROOP <span>↗</span></a></div></div><div className="hero-art"><img src="https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?auto=format&fit=crop&w=1600&q=85" alt="Sunlit coastline and sea in Goa, India"/><div className="image-caption"><span>15°29′ N / 73°49′ E</span><span>THE WEST COAST, SOMEWHERE</span></div><div className="hero-stamp">GO<br/><small>WHERE<br/>YOU FEEL</small></div></div><div className="hero-bottom"><div className="hero-meta">{['01 — DESTINATIONS','02 — EXPERIENCES','03 — TROOPS','04 — TRIPS'].map(x=><span key={x}>{x}</span>)}</div><Wordmark/></div></section>
- <section id="discover" className="discover section-pad"><div className="section-index reveal"><span>01 / A COUNTRY IN MOTION</span><span>↓ SCROLL TO WANDER</span></div><div className="discover-intro"><h2 className="reveal">India is not<br/><em>one trip.</em></h2><div className="discover-copy reveal"><p>It's a collection of routes, rituals, flavours, landscapes and stories. Go beyond the places everyone already knows.</p><span className="small-rule"/><p className="small-note">A LITTLE CURIOSITY GOES A LONG WAY.</p></div></div><div className="regions">{regions.map(r=><div className="region reveal" key={r[0]}><span>{r[0]}</span><strong>{r[1]}</strong><p>{r[2]}</p><b>↗</b></div>)}</div></section>
- <section id="experiences" className="experiences section-pad"><div className="section-index reveal"><span>02 / GO A LITTLE DEEPER</span><span>FOLLOW A FEELING</span></div><h2 className="experience-heading reveal">Don't just<br/>visit. <em>experience.</em></h2><div className="experience-note"><span>CHOOSE YOUR OWN WAY IN</span><p>A place changes when you meet it on your own terms.</p></div><div className="experience-tabs" role="group" aria-label="Choose a trip experience">{experiences.map(item=><button key={item.id} aria-pressed={active.id===item.id} className={active.id===item.id?'active':''} onClick={()=>setActive(item)}>{item.label}</button>)}</div><RouteDrawing active={active}/></section>
- <section id="troop" className="troop section-pad"><div className="section-index reveal"><span>03 / BETTER TOGETHER</span><span>PEOPLE MAKE THE PLACE</span></div><div className="troop-grid"><div><h2 className="reveal">Some trips are better<br/>with the right <em>people.</em></h2><p className="troop-lead reveal">Choose your vibe. Tell us where you want to go. We'll help you build a troop around the trip.</p><form className="troop-form reveal" onSubmit={e=>{e.preventDefault();setMessage(`Your ${vibe.toLowerCase()} troop brief is ready to shape.`)}}><label>GOING TO<input aria-label="Going to" placeholder="Somewhere in India"/></label><label>WHEN<select aria-label="When"><option>Whenever works</option><option>This month</option><option>Next month</option><option>I'll pick a date</option></select></label><fieldset><legend>TRIP VIBE</legend><div className="vibes">{['SLOW & SOCIAL','ADVENTURE MODE','FOOD FIRST','CULTURE HUNT','BEACH PEOPLE','MOUNTAIN PEOPLE'].map(x=><button type="button" key={x} aria-pressed={vibe===x} onClick={()=>setVibe(x)}>{x}</button>)}</div></fieldset><button className="button button-dark submit" type="submit">BUILD MY TROOP <span>↗</span></button>{message&&<p className="form-message" role="status">{message}</p>}</form></div><div className="profiles"><div className="profile-heading"><span>THE KIND OF PEOPLE YOU MIGHT MEET</span><span>DEMO PROFILES</span></div>{profiles.map(x=><article className="profile reveal" key={x[0]}><img src={`https://images.unsplash.com/${x[3]}?auto=format&fit=crop&w=280&q=80`} alt={`Illustrative portrait for demo profile ${x[0]}`}/><div><strong>{x[0]} <span>/ {x[1]}</span></strong><p>{x[2]}</p></div><b>↗</b></article>)}<p className="fiction-note">ILLUSTRATIVE DEMO PROFILES · PEOPLE CONNECT AROUND SHARED TRAVEL INTENT.</p></div></div></section>
- <section id="plan" className="planning section-pad"><div className="section-index reveal"><span>04 / MAKE IT HAPPEN</span><span>FROM IDEA TO OUT THERE</span></div><div className="planning-grid"><div><h2 className="reveal">Less planning.<br/>More <em>going.</em></h2><div className="steps">{steps.map(s=><div className="step reveal" key={s[0]}><span>{s[0]}</span><div><b>{s[1]}</b><p>{s[2]}</p></div><i>↗</i></div>)}</div></div><aside className="receipt reveal"><div className="receipt-head"><span>TRAVELTROOP / ITINERARY</span><span>ILLUSTRATIVE</span></div><h3>DELHI <i>→</i> JAIPUR <i>→</i> UDAIPUR</h3>{[['DAY 01','Old City','Local dinner','Sunset walk'],['DAY 02','Craft experience','Café','Night market'],['DAY 03','Lake','Local breakfast','Return']].map(day=><div className="receipt-day" key={day[0]}><b>{day[0]}</b><p>{day.slice(1).map(line=><React.Fragment key={line}>{line}<br/></React.Fragment>)}</p></div>)}<div className="receipt-foot">A ROUTE TO MAKE YOUR OWN <span>TT / 028</span></div></aside></div></section>
- <section className="closing section-pad"><div className="section-index"><span>05 / THE OPEN ROAD</span><span>YOUR STORY, YOUR INDIA</span></div><div className="closing-content"><p className="eyebrow">ONE COUNTRY. A THOUSAND WAYS TO TRAVEL IT.</p><h2>Your next story<br/>starts somewhere<br/><em>in India.</em></h2><div className="hero-actions"><a className="button button-dark" href="#discover">START EXPLORING <span>↗</span></a><a className="button" href="#troop">PLAN A TRIP <span>↗</span></a></div></div></section>
- </main><footer className="footer"><div className="footer-nav">{[['ABOUT','#discover'],['EXPLORE','#discover'],['EXPERIENCES','#experiences'],['TROOPS','#troop'],['CONTACT','mailto:hello@traveltroop.in']].map(([a,h])=><a href={h} key={a}>{a}</a>)}</div><div className="footer-note"><span>TRAVEL INDIA. FIND YOUR PEOPLE.</span><span>MADE FOR THE WAY OUT THERE.</span></div><Wordmark footer/></footer></>;
-}
-export default App;

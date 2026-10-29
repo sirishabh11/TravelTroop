@@ -2,3 +2,8 @@ node_modules/
 .npm-cache/
 dist/
 .DS_Store
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+coverage/
