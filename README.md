@@ -1,12 +1,12 @@
-# TravelTroop · Phase 1
+# TravelTroop · Phases 1–2
 
 **From group chaos to a bookable trip.**
 
-React + TypeScript + Vite, with Supabase Auth and PostgreSQL. This phase covers **leader sign-in → trip creation → invitation → participant preferences → private leader dashboard**. It does not implement feasibility scoring, AI, bookings, payments, or messaging integrations.
+React + TypeScript + Vite, with Supabase Auth and PostgreSQL. Phase 1 covers **leader sign-in → trip creation → invitation → participant preferences → private leader dashboard**. Phase 2 adds deterministic group feasibility, saved-option compromise suggestions, and temporary what-if scenarios. AI, bookings, payments, and messaging integrations are outside these phases.
 
 ## Status
 
-The real Supabase integration and SQL backend are implemented; there is **no mock persistence or local-data fallback**. Without configuration, data routes show a connection notice instead of claiming to save. A hosted Supabase project has not been configured or verified in this environment. Do not call this a deployed, end-to-end service until the manual acceptance check below passes against your project.
+The real Supabase integration and SQL backend are implemented; there is **no mock persistence or local-data fallback**. Without configuration, data routes show a connection notice instead of claiming to save. Hosted Supabase credentials are not available in this development environment, so live integration has not been verified here. Do not call this a deployed, end-to-end service until the manual acceptance check below passes against your project.
 
 ## Develop
 
@@ -97,4 +97,61 @@ The previous GitHub Pages publishing workflow is replaced with validation CI bec
 - `supabase/tests/access.sql`, `scripts/test-db.sh`: real PostgreSQL access tests in disposable Docker.
 - `src/**/*.test.*`: important form and domain tests.
 
-Future feasibility or AI modules can consume the owner-authorized trip/options/responses through this data boundary. None are implemented here.
+The Phase 2 engine consumes the same owner-authorized trip/options/responses through this data boundary. Future AI modules can reuse its structured results; no AI features are implemented.
+
+## Phase 2 · Group Feasibility Engine
+
+No new database migration, dependencies, authentication changes, API queries, or environment variables are required. **Do not rerun the Phase 1 migration** for this update. Deploy the Phase 2 branch using the existing Netlify build settings. Once connected, the leader dashboard passes `loadDashboard`'s actual saved options, responses, and minimum directly to `FeasibilityPanel`; no application fixture or fallback response is used.
+
+### Constraints and statuses
+
+The pure engine lives in `src/lib/feasibility/index.ts`. A participant is eligible only when both of these hard constraints hold:
+
+- Their availability includes a valid saved option with **the exact same departure and return dates** as the evaluated option. This intentionally transfers date availability across destinations, since destination preference is soft. Overlapping or contained ranges alone are not treated as availability. Unknown IDs never establish availability.
+- Their maximum per-person budget is at least the option's estimated INR cost. Comparisons use integer paise; invalid, negative, nonfinite, or fractional-paise amounts are not eligible inputs.
+
+Destination preferences (trimmed and case-insensitive) are soft; a mismatch cannot exclude a person. Travel interests remain visible in Phase 1 responses but do not add an undocumented ranking weight. The organizer and invitees who have not responded are not counted automatically.
+
+| Status | Rule |
+| --- | --- |
+| Ready | Confirmed eligible count reaches the minimum |
+| Potential | Confirmed + Interested + Unsure eligible count reaches the minimum, but Confirmed alone does not |
+| Not feasible | Total eligible count is below the minimum |
+
+Ready describes the submitted preferences and estimated cost; it is not a reservation, payment, guaranteed attendance, or independently verified price.
+
+### Exact ranking algorithm
+
+Options are sorted lexicographically (compare each criterion, moving to the next only when tied):
+
+1. Ready before other statuses.
+2. More Confirmed eligible participants.
+3. More Interested eligible participants.
+4. Higher destination-alignment share: eligible people who prefer the destination / all eligible people.
+5. Higher affordability share: eligible people / all date-available people.
+6. Lower saved estimated per-person cost.
+7. Earlier departure, earlier return, normalized destination, then option ID for reproducible exact ties.
+
+A zero denominator has a zero share. Ratios are compared with integer cross-products, not rounded display percentages. Unsure participants contribute to Potential but receive no extra ranking weight. **Potential does not receive an independent rank boost**: an option with more confirmed people can rank above a Potential option with fewer confirmations, even if that first option is currently Not feasible. This preserves the requested priority on confirmed headcount; review the status as well as the rank. Counts, shares, rules, named exclusions, and confirmation gaps are visible in the dashboard.
+
+### Data quality and identity limits
+
+The engine does not mutate its inputs. Duplicate IDs in availability arrays are deduplicated, and unknown IDs are removed with diagnostics. Identical repeated option records count once. Conflicting versions of the same option ID are excluded rather than guessed. Options with malformed dates/costs are excluded with diagnostics.
+
+Responses are processed newest first by `updated_at`. Each response ID and non-null named invitation ID can count only once; equal update times use a canonical field tuple as a deterministic tie-breaker. Invalid ID/update-time records are ignored; update timestamps require an explicit timezone so duplicate resolution cannot depend on the machine’s local timezone. After choosing a record, invalid core participant/availability/budget/commitment fields exclude it; an older optimistic version is not restored. A panel lists handled data issues. Valid records with no known selected date options remain hard-excluded by dates. Names alone do not establish identity: separate general-link response IDs cannot be reliably deduplicated as the same human. This matches Phase 1's account-free invitation design.
+
+### Compromises and what-if scenarios
+
+Suggestions use saved proposals only:
+
+- Date comparisons hold destination and cost constant and require an actual proposed alternative with more confirmed eligible people. Newly eligible and lost people are listed.
+- Cost comparisons hold exact dates constant and require a lower-cost saved option that admits more eligible people. If its destination changes, that trade-off is explicit.
+- A confirmation suggestion shows the best-ranked option's exact confirmation gap or additional eligible response count. No generic booking advice is emitted when an option is already Ready and no meaningful alternative exists.
+
+The collapsed **Explore what-if** simulator lets the leader choose any valid existing option, temporarily change the cost/minimum, and see a simulated status and gained/lost participants compared with its saved baseline. Hypothetical prices are clearly labeled; they are never treated as a saved proposal or fed into saved rankings/suggestions. Changing the minimum never changes eligibility or commitments. Switching options resets its price to the saved estimate; reset restores the original scenario. Refresh/navigation discards simulation state. Invalid/blank values show validation messages and hide stale simulation results. There are no save calls, browser persistence, new dates, new destinations, or invented commitments.
+
+### Testing Phase 2 without Supabase
+
+Run `npm test` and `npm run build`. Fixtures in `src/test/feasibilityFixtures.ts` are test-only and never imported by app routes. Engine tests cover hard/soft constraints, commitments, missing data, duplicates/invalid IDs, deterministic ranking ties, compromise evidence and immutable simulations. Component tests exercise named exclusions, empty/error states, input validation and reset. Dashboard tests mock the existing API boundary, return different actual-shaped responses on refresh, and assert that computed rankings change without writes. These are fixture-based integration tests, **not live hosted Supabase tests**.
+
+After deployment, open an existing leader dashboard, collect at least two real responses, verify the saved status and named exclusions, try a temporary estimate, reset, and refresh. Confirm that saved estimates and participant responses remain unchanged. No public fixture/demo route is deployed. Stop after Phase 2; feasibility explanations are rule-based and contain no LLM or autonomous actions.

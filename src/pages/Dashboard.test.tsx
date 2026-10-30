@@ -74,7 +74,11 @@ it("marks the actual personal invitation as responded", async () => {
   expect(
     await screen.findByText("1 of 1 named invitations have a response."),
   ).toBeVisible();
-  expect(within(screen.getByRole("list")).getByText("Responded")).toBeVisible();
+  expect(
+    within(
+      screen.getByRole("list", { name: "Personal invitations" }),
+    ).getByText("Responded"),
+  ).toBeVisible();
   expect(screen.getByRole("progressbar")).toHaveValue(1);
 });
 it("handles unauthorized dashboard fetches without revealing a response", async () => {
@@ -82,4 +86,46 @@ it("handles unauthorized dashboard fetches without revealing a response", async 
   show();
   expect(await screen.findByRole("alert")).toHaveTextContent("Access denied");
   expect(screen.queryByText("What your people said.")).not.toBeInTheDocument();
+});
+
+it("computes feasibility from loadDashboard data and recalculates after refresh without writes", async () => {
+  const { fireEvent } = await import("@testing-library/react");
+  const { addInvitees } = await import("../lib/api");
+  const { makeOption, makeResponse } =
+    await import("../test/feasibilityFixtures");
+  const initial = {
+    trip: { ...trip, minimum_participants: 2 },
+    options: [makeOption("goa")],
+    responses: [
+      makeResponse("API Maya"),
+      makeResponse("API Arjun", { max_budget: 10000 }),
+    ],
+    invitees: [],
+  };
+  const updated = {
+    ...initial,
+    responses: [
+      makeResponse("API Maya"),
+      makeResponse("API Arjun", { max_budget: 15000 }),
+    ],
+  };
+  vi.mocked(loadDashboard)
+    .mockResolvedValue(updated)
+    .mockResolvedValueOnce(initial);
+  show();
+  expect(
+    await screen.findByText("Not feasible", { exact: true }),
+  ).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Explore what-if" }));
+  fireEvent.change(screen.getByLabelText("Simulated cost per person · INR"), {
+    target: { value: "9000" },
+  });
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "Not feasible saved → Ready simulated",
+  );
+  expect(addInvitees).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Refresh responses ↻" }));
+  expect(await screen.findByText("Ready", { exact: true })).toBeVisible();
+  expect(loadDashboard).toHaveBeenCalledTimes(2);
+  expect(screen.queryByText(/SIMULATED RESULT/)).not.toBeInTheDocument();
 });
