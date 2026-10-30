@@ -415,3 +415,125 @@ it("does not call the provider if quota reservation throws", async () => {
   expect(body.answer.source).toBe("deterministic");
   expect(deps.fetch).not.toHaveBeenCalled();
 });
+
+const geminiKey = "AIza-test-only-not-a-real-key-123456789";
+function geminiOutput(selection: unknown, finishReason = "STOP") {
+  return new Response(
+    JSON.stringify({
+      candidates: [
+        {
+          finishReason,
+          content: {
+            parts: [{ text: JSON.stringify(selection) }],
+          },
+        },
+      ],
+    }),
+  );
+}
+const validSelection = {
+  focus: "budget",
+  fact_ids: ["group", "option-1-budget"],
+  suggestion_ids: ["saved-budget"],
+};
+it("uses Gemini with server-only header credentials and the same minimized evidence schema", async () => {
+  const { handler, deps, backend } = setup();
+  Object.assign(deps.env, {
+    AI_PROVIDER: "gemini",
+    GEMINI_API_KEY: geminiKey,
+    OPENAI_API_KEY: mockKey,
+  });
+  vi.mocked(deps.fetch).mockResolvedValue(geminiOutput(validSelection));
+  const response = await handler(request(insights));
+  const body = await response.json();
+  expect(body.answer.source).toBe("ai");
+  expect(backend.rpc).toHaveBeenCalledWith("reserve_assistant_call", {
+    target_trip: ids.trip,
+  });
+  const [url, init] = vi.mocked(deps.fetch).mock.calls[0];
+  expect(url).toBe(
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+  );
+  expect(init?.headers).toEqual({
+    "Content-Type": "application/json",
+    "x-goog-api-key": geminiKey,
+  });
+  const sent = JSON.parse(String(init?.body));
+  expect(
+    sent.generationConfig.responseJsonSchema.properties.fact_ids.items.enum,
+  ).toContain("group");
+  expect(sent.generationConfig.maxOutputTokens).toBe(700);
+  for (const secret of [
+    geminiKey,
+    mockKey,
+    ids.owner,
+    ids.trip,
+    "Sirisha",
+    "Shubh",
+    "invitation_token",
+    "edit_token",
+  ])
+    expect(String(init?.body)).not.toContain(secret);
+  expect(JSON.stringify(body)).not.toContain(geminiKey);
+});
+it.each([
+  { AI_PROVIDER: "unknown", GEMINI_API_KEY: geminiKey },
+  { AI_PROVIDER: "gemini", OPENAI_API_KEY: mockKey },
+  { AI_PROVIDER: "gemini", GEMINI_API_KEY: "bad key" },
+  {
+    AI_PROVIDER: "gemini",
+    GEMINI_API_KEY: geminiKey,
+    GEMINI_MODEL: "../../other-host",
+  },
+])(
+  "falls back without spending quota for invalid provider configuration %o",
+  async (env) => {
+    const { handler, deps, backend } = setup();
+    Object.assign(deps.env, env);
+    expect(
+      (await (await handler(request(insights))).json()).answer.source,
+    ).toBe("deterministic");
+    expect(deps.fetch).not.toHaveBeenCalled();
+    expect(backend.rpc).toHaveBeenCalledTimes(1);
+  },
+);
+it.each([
+  () => geminiOutput(validSelection, "MAX_TOKENS"),
+  () => geminiOutput(validSelection, "SAFETY"),
+  () => geminiOutput({ ...validSelection, fact_ids: ["invented"] }),
+  () => geminiOutput({ ...validSelection, approved: true }),
+  () => new Response(JSON.stringify({ candidates: [] })),
+  () => new Response("rate limited", { status: 429 }),
+  () => new Response("x".repeat(24001)),
+])(
+  "falls back safely for rejected or unverifiable Gemini output %#",
+  async (output) => {
+    const { handler, deps } = setup();
+    Object.assign(deps.env, {
+      AI_PROVIDER: "gemini",
+      GEMINI_API_KEY: geminiKey,
+    });
+    vi.mocked(deps.fetch).mockResolvedValue(output());
+    expect(
+      (await (await handler(request(insights))).json()).answer.source,
+    ).toBe("deterministic");
+    expect(deps.fetch).toHaveBeenCalledTimes(1);
+  },
+);
+it("supports a configured Gemini model and falls back on network failure without switching providers", async () => {
+  const { handler, deps } = setup();
+  Object.assign(deps.env, {
+    AI_PROVIDER: "gemini",
+    GEMINI_API_KEY: geminiKey,
+    GEMINI_MODEL: "gemini-2.5-flash-lite",
+    OPENAI_API_KEY: mockKey,
+  });
+  vi.mocked(deps.fetch).mockRejectedValue(new Error("timeout"));
+  expect((await (await handler(request(insights))).json()).answer.source).toBe(
+    "deterministic",
+  );
+  expect(vi.mocked(deps.fetch).mock.calls[0][0]).toContain(
+    "gemini-2.5-flash-lite:generateContent",
+  );
+  expect(deps.fetch).toHaveBeenCalledTimes(1);
+});
