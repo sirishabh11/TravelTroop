@@ -1,0 +1,127 @@
+.leader-assistant > .row-between h2 {
+  margin: 12px 0 4px;
+}
+.assistant-section {
+  border-top: 1px solid var(--rule);
+  padding: 26px 0;
+  margin-top: 20px;
+  min-width: 0;
+}
+.assistant-section h3 {
+  margin: 0 0 14px;
+}
+.assistant-section h4 {
+  font:
+    18px "Newsreader",
+    serif;
+  margin: 20px 0 10px;
+}
+.assistant-section label,
+.assistant-question small {
+  display: block;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.assistant-question {
+  margin: 24px 0;
+  display: grid;
+  gap: 10px;
+}
+.assistant-question .button {
+  justify-self: start;
+}
+.assistant-question small {
+  color: var(--sub);
+  font-size: 10px;
+}
+.assistant-answer,
+.brief-preview {
+  padding: 22px;
+  background: #edf0f7;
+  border: 1px solid #b5c0d9;
+  margin-top: 24px;
+  font-size: 12px;
+  line-height: 1.9;
+  overflow-wrap: anywhere;
+}
+.assistant-answer .badge {
+  display: inline-block;
+  white-space: normal;
+}
+.assistant-answer ul {
+  padding-left: 20px;
+}
+.assistant-answer li {
+  margin-bottom: 12px;
+}
+.followup-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+.followup-list > li {
+  border: 1px solid var(--rule);
+  padding: 20px;
+  background: white;
+  min-width: 0;
+}
+.followup-list strong {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.followup-list .badge {
+  white-space: normal;
+}
+.assistant-section select {
+  display: block;
+  width: 100%;
+  background: white;
+  border: 1px solid #b9b7b0;
+  padding: 13px;
+  margin: 8px 0 20px;
+  font-size: 13px;
+  min-width: 0;
+}
+.assistant-section .approval-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 22px 0;
+}
+.approval-check input {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--blue);
+  margin-top: 3px;
+}
+.leader-assistant .assistant-section textarea {
+  line-height: 1.8;
+}
+.leader-assistant > p {
+  max-width: 850px;
+}
+@media (max-width: 650px) {
+  .followup-list {
+    grid-template-columns: 1fr;
+  }
+  .assistant-answer,
+  .brief-preview,
+  .followup-list > li {
+    padding: 17px 13px;
+  }
+  .assistant-section .row-between {
+    align-items: flex-start;
+  }
+  .assistant-section select {
+    font-size: 16px;
+  }
+  .assistant-question .button {
+    justify-self: stretch;
+  }
+  .leader-assistant > .row-between .button {
+    width: 100%;
+  }
+}

@@ -9,6 +9,7 @@ import {
 import type { Dashboard as DashboardData } from "../lib/types";
 import { brand } from "../lib/brand";
 import FeasibilityPanel from "../components/FeasibilityPanel";
+import LeaderAssistant from "../components/LeaderAssistant";
 import {
   formatDates,
   formatMoney,
@@ -175,6 +176,7 @@ export default function Dashboard() {
         responses={responses}
         minimum={trip.minimum_participants}
       />
+      <LeaderAssistant key={trip.id} tripId={trip.id} options={options} />
       <div className="dashboard-grid">
         <section className="panel">
           <div className="section-label">01 / BRING YOUR PEOPLE IN</div>

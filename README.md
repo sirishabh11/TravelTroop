@@ -1,8 +1,8 @@
-# TravelTroop · Phases 1–2
+# TravelTroop · Phases 1–3A
 
 **From group chaos to a bookable trip.**
 
-React + TypeScript + Vite, with Supabase Auth and PostgreSQL. Phase 1 covers **leader sign-in → trip creation → invitation → participant preferences → private leader dashboard**. Phase 2 adds deterministic group feasibility, saved-option compromise suggestions, and temporary what-if scenarios. AI, bookings, payments, and messaging integrations are outside these phases.
+React + TypeScript + Vite, with Supabase Auth and PostgreSQL. Phase 1 covers **leader sign-in → trip creation → invitation → participant preferences → private leader dashboard**. Phase 2 adds deterministic group feasibility, saved-option compromise suggestions, and temporary what-if scenarios. Phase 3A adds an owner-authorized AI-assisted evidence panel, follow-up drafts, and explicitly approved brief snapshots. It does not build itineraries, make bookings/payments, or automatically send messages.
 
 ## Status
 
@@ -19,7 +19,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-`npm run build` runs TypeScript and a production Vite build. `npm test` runs form/domain tests. `npm run test:db` needs Docker and runs migration/access-rule tests against an isolated PostgreSQL 17 container. It exposes no host ports and removes the container afterwards. The database test harness supplies a minimal Supabase `auth.users` / `auth.uid()` contract; it does **not** test the hosted Auth service or email delivery.
+`npm run build` type-checks the frontend and Netlify Function and produces a production Vite build. `npm test` runs form/domain tests. `npm run test:db` needs Docker and runs migration/access-rule tests against an isolated PostgreSQL 17 container. It exposes no host ports and removes the container afterwards. The database test harness supplies a minimal Supabase `auth.users` / `auth.uid()` contract; it does **not** test the hosted Auth service or email delivery.
 
 Branding is centralized in `src/lib/brand.ts`; adjust the static metadata in `index.html` as well for crawlers. `src/saas.css` extends the original styles instead of replacing them.
 
@@ -99,7 +99,7 @@ See [invitation link deployment troubleshooting](docs/invitation-deployment.md) 
 - `supabase/tests/access.sql`, `scripts/test-db.sh`: real PostgreSQL access tests in disposable Docker.
 - `src/**/*.test.*`: important form and domain tests.
 
-The Phase 2 engine consumes the same owner-authorized trip/options/responses through this data boundary. Future AI modules can reuse its structured results; no AI features are implemented.
+The Phase 2 engine consumes the same owner-authorized trip/options/responses through this data boundary. Phase 3A reuses these structured results in its owner-authorized assistant and approved brief renderer.
 
 ## Phase 2 · Group Feasibility Engine
 
@@ -156,4 +156,8 @@ The collapsed **Explore what-if** simulator lets the leader choose any valid exi
 
 Run `npm test` and `npm run build`. Fixtures in `src/test/feasibilityFixtures.ts` are test-only and never imported by app routes. Engine tests cover hard/soft constraints, commitments, missing data, duplicates/invalid IDs, deterministic ranking ties, compromise evidence and immutable simulations. Component tests exercise named exclusions, empty/error states, input validation and reset. Dashboard tests mock the existing API boundary, return different actual-shaped responses on refresh, and assert that computed rankings change without writes. These are fixture-based integration tests, **not live hosted Supabase tests**.
 
-After deployment, open an existing leader dashboard, collect at least two real responses, verify the saved status and named exclusions, try a temporary estimate, reset, and refresh. Confirm that saved estimates and participant responses remain unchanged. No public fixture/demo route is deployed. Stop after Phase 2; feasibility explanations are rule-based and contain no LLM or autonomous actions.
+After deployment, open an existing leader dashboard, collect at least two real responses, verify the saved status and named exclusions, try a temporary estimate, reset, and refresh. Confirm that saved estimates and participant responses remain unchanged. No public fixture/demo route is deployed. Phase 2 itself is rule-based and contains no LLM or autonomous actions; the separate Phase 3A assistant is described below.
+
+## Phase 3A · AI Group Leader Assistant
+
+See [Phase 3A setup and acceptance checks](docs/phase3a-setup.md) for the **new migration**, server-side Netlify environment variables, secure AI fallback, deployment and live validation. Existing Phase 1/2 flows and invitation security remain unchanged. Do not rerun the Phase 1 migration; apply only `202610300002_leader_assistant.sql` to an existing configured project.

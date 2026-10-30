@@ -25,5 +25,9 @@ $$;
 grant usage on schema public,auth to anon,authenticated;
 grant execute on function auth.uid() to anon,authenticated;
 SQL
-docker exec -i "$container" psql -X -U postgres -v ON_ERROR_STOP=1 < supabase/migrations/202610300001_phase1.sql
+for migration in supabase/migrations/*.sql; do
+  docker exec -i "$container" psql -X -U postgres -v ON_ERROR_STOP=1 < "$migration"
+done
 docker exec -i "$container" psql -X -U postgres -v ON_ERROR_STOP=1 < supabase/tests/access.sql
+
+docker exec -i "$container" psql -X -U postgres -v ON_ERROR_STOP=1 < supabase/tests/assistant.sql
