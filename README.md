@@ -74,9 +74,11 @@ The UI handles loading, validation, empty lists, backend failures, clipboard fal
 
 ## Deployment
 
-Use a static host that supports **SPA fallback rewrites**. The repository includes `netlify.toml` to build `dist`, serve deep links through `index.html`, and set a restrictive referrer policy. Connect your feature/main branch as appropriate, set the two public Supabase build variables, and build with `npm ci && npm run build`. Require HTTPS for production. Configure the deployed origin and callback in Supabase Auth, then complete the acceptance check.
+Use a static host that supports **SPA fallback rewrites**. The repository includes `netlify.toml` to build `dist`, serve deep links through `index.html`, and set a restrictive referrer policy. `public/_redirects` is also copied into `dist/_redirects`, so the SPA fallback ships with the build even for manual artifact deployments. Connect your feature/main branch as appropriate, set the two public Supabase build variables, and build with `npm ci && npm run build`. Require HTTPS for production. Configure the deployed origin and callback in Supabase Auth, then complete the acceptance check.
 
 The previous GitHub Pages publishing workflow is replaced with validation CI because Pages cannot provide the BrowserRouter fallback used by these private and invitation routes. CI installs locked dependencies, runs unit/form tests, database/RLS tests, and the production build. It does not deploy or apply production database migrations. Run the migration separately before launching the frontend. If you choose another host, configure a rewrite from all unknown paths to `/index.html` (status 200) while preserving actual static asset requests. Vite's `preview` command is for local build inspection, not a production server.
+
+See [invitation link deployment troubleshooting](docs/invitation-deployment.md) if friends see a 404.
 
 ## Hosted acceptance checklist (still required)
 
