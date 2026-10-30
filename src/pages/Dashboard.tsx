@@ -8,6 +8,7 @@ import {
 } from "../lib/api";
 import type { Dashboard as DashboardData } from "../lib/types";
 import { brand } from "../lib/brand";
+import FeasibilityPanel from "../components/FeasibilityPanel";
 import {
   formatDates,
   formatMoney,
@@ -169,6 +170,11 @@ export default function Dashboard() {
           <small>Possibilities to consider</small>
         </div>
       </div>
+      <FeasibilityPanel
+        options={options}
+        responses={responses}
+        minimum={trip.minimum_participants}
+      />
       <div className="dashboard-grid">
         <section className="panel">
           <div className="section-label">01 / BRING YOUR PEOPLE IN</div>
@@ -250,8 +256,8 @@ export default function Dashboard() {
             </>
           )}
           <p className="quiet">
-            The group minimum is a target, not a feasibility score. Confirmed
-            does not imply payment or a booking.
+            Feasibility uses saved responses, dates, and budgets. Confirmed does
+            not imply payment or a booking.
           </p>
         </section>
       </div>
@@ -343,7 +349,7 @@ export default function Dashboard() {
           them privately. Their private response-edit link is separate.
         </p>
         {invitees.length > 0 && (
-          <ul className="invitation-list">
+          <ul className="invitation-list" aria-label="Personal invitations">
             {invitees.map((i) => (
               <li key={i.id}>
                 <div className="row-between">
